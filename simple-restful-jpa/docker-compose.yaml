@@ -1,0 +1,63 @@
+name: restful-api-project
+
+services:
+  restful-api:
+    image: restful-api-sample:v1.0.0
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/appdb
+      SPRING_DATASOURCE_USERNAME: appuser
+      SPRING_CONFIG_IMPORT: optional:configtree:/run/secrets/
+
+    secrets:
+      - source: db_password
+        target: spring.datasource.password
+
+    volumes:
+      - image-backup-vol:/app/filestorage/images
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_DB: appdb
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    # profiles:
+    #   - dev
+    secrets:
+      - db_password
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U appuser -d appdb"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  image-backup-vol:
+  postgres-data:
